@@ -1,0 +1,50 @@
+configuration :
+- name : alice
+  ip   : 127.0.0.1
+  port : 8081
+- name : bob
+  ip   : 127.0.0.1
+  port : 8082
+- name : charlie
+  ip   : 128.237.208.193
+  port : 8083
+- name : daphnie
+  ip   : 128.237.208.193
+  port : 8084
+- name : fred
+  ip   : 127.0.0.1
+  port : 8085
+
+# This is the incoming port on which MP will listen
+# May be changed for further communication as usual
+
+sendRules :
+  - action : drop # Ack message number 4 from bob to alice will not be sent
+    src    : bob
+    dest   : alice
+    kind   : Ack
+    seqNum : 4
+  - action : delay # Every Lookup message in the system will be delayed
+    kind   : Lookup
+  - action : duplicate
+    kind   : dup
+
+receiveRules :
+  - action : duplicate
+    src    : charlie
+    seqNum : 3
+  - action : delay
+    kind   : del
+  - action : drop
+    kind   : dro
+
+groups :
+  - name: Group 1
+    members :
+    - alice
+    - bob
+    - charlie
+  - name: Group 2
+    members :
+    - fred
+    - daphnie
