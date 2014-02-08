@@ -35,7 +35,7 @@ public class TestApplication
         BufferedReader br=new BufferedReader(new InputStreamReader(System.in));
         while(choice != 0)
         {
-            System.out.println("What do you wanna do? 1.Send 2.Receive 3.What is time? 0.End:");
+            System.out.println("What do you wanna do? 1.Send 2.Send Multicast 3.Receive 4.What is time? 0.End:");
             choice=scan.nextInt();
             if(choice<0 || choice>3)
                 continue;
@@ -53,7 +53,7 @@ public class TestApplication
                     mp.send(m);
                     break;
                 
-                case 2:
+                case 3:
                     //System.out.println("Receiving message:");
                     TimeStampedMessage mem=mp.receive(); 
                     if(mem.destination.equalsIgnoreCase("NULL"))
@@ -67,7 +67,7 @@ public class TestApplication
                         System.out.println("  timestamp:" + mem.ts.toString());
                     }
                     break;
-                case 3:
+                case 4:
                 	System.out.println("Time is: " + mp.clock.getTime().toString());
                 	break;
                 case 0: System.exit(1);
