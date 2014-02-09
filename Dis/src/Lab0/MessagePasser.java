@@ -111,32 +111,10 @@ public class MessagePasser implements Runnable
             m.set_duplicate(false);         
             String action = "send";
             Socket s;
+        	List<String> members = null;
+
             //System.out.println("About to create socket!");
-            if(!sendingMap.containsKey(m.destination))
-            {
-                String IP = "";
-                int port_no = -1;
-                for (Map<String, Object> config:conf) 
-                {
-                        if (config.get("name").equals(m.destination)) 
-                        {
-                                IP = (String) config.get("ip");
-                                port_no = (Integer) config.get("port");
-                                break;
-                        }
-                }
-                if(port_no == -1)
-                {
-                    System.out.println("IP of destination not reachable");
-                    return;
-                }
-                s=new Socket(IP,port_no);
-                sendingMap.put(m.destination, s);
-            }
-            else
-            {
-                s=sendingMap.get(m.destination);
-            }
+            
             
             clock.increase(local_name);
             
@@ -170,6 +148,86 @@ public class MessagePasser implements Runnable
                 break;
             }       
             System.out.println(action);
+            
+            
+            if(kind.equals("multicast")){
+                for (Map<String, Object> group:groups) 
+                {
+                	if(group.containsKey("name") && (group.get("name").equals(dest))){
+                		if(group.containsKey("members")){
+                		members = (List<String>) group.get("members");}
+                	}
+                	
+                	else
+                	{
+                	continue;
+                	}
+                }
+                
+                
+                for(String member:members){
+                	TimeStampedMessage readyMsg = new TimeStampedMessage(member, kind, m1.data,m.ts);
+                    
+                    if(!sendingMap.containsKey(readyMsg.destination))
+                    {
+                        String IP = "";
+                        int port_no = -1;
+                        for (Map<String, Object> config:conf) 
+                        {
+                                if (config.get("name").equals(readyMsg.destination)) 
+                                {
+                                        IP = (String) config.get("ip");
+                                        port_no = (Integer) config.get("port");
+                                        break;
+                                }
+                        }
+                        if(port_no == -1)
+                        {
+                            System.out.println("IP of destination not reachable");
+                            return;
+                        }
+                        s=new Socket(IP,port_no);
+                        sendingMap.put(readyMsg.destination, s);
+                    }
+                    else
+                    {
+                        s=sendingMap.get(readyMsg.destination);
+                    }
+                    oos=new ObjectOutputStream(s.getOutputStream());
+                    oos.writeObject(readyMsg);
+                    
+                    
+                }
+            }
+            
+            else{
+            
+            if(!sendingMap.containsKey(m.destination))
+            {
+                String IP = "";
+                int port_no = -1;
+                for (Map<String, Object> config:conf) 
+                {
+                        if (config.get("name").equals(m.destination)) 
+                        {
+                                IP = (String) config.get("ip");
+                                port_no = (Integer) config.get("port");
+                                break;
+                        }
+                }
+                if(port_no == -1)
+                {
+                    System.out.println("IP of destination not reachable");
+                    return;
+                }
+                s=new Socket(IP,port_no);
+                sendingMap.put(m.destination, s);
+            }
+            else
+            {
+                s=sendingMap.get(m.destination);
+            }
+            
             try
             {
                 if(action.equals("drop"))
@@ -247,6 +305,7 @@ public class MessagePasser implements Runnable
                 System.out.println("Exception in parsing action:" + e);
             }    
         }
+        }
         catch(Exception e)
         {
             System.out.println("Excdeption in sending:" + e);
@@ -255,6 +314,7 @@ public class MessagePasser implements Runnable
     
     void sendMulticast(Message m2){
     	
+    	/*
     	List<String> members = null;
         for (Map<String, Object> group:groups) 
         {
@@ -272,8 +332,9 @@ public class MessagePasser implements Runnable
         
         for(String member:members){
             Message readyMsg = new Message(member, m2.kind, m2.data);
-        	send(readyMsg);
-        }
+            */
+        	send(m2);
+        //}
 
     	
     }
