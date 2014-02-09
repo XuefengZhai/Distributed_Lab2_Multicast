@@ -533,8 +533,8 @@ class OurRunnable implements Runnable
                     break;
                 }
                 
-                
-                if(kind.equals("multicast")) //If multicast----------------------------------1. put in hold back queue 2. check if reliable if not send NACK 3. causal order 4 deliver
+                //Need something to watch the holdback queue or the time and check the reliability and causal order
+                if(kind.equals("multicast")) //If multicast----------------------------------1. put in hold back queue 2. check if reliable if not multicast NACK 3. causal order 4 deliver
                 {
                 //System.out.println("Action is:"+action);
                 try
@@ -607,7 +607,7 @@ class OurRunnable implements Runnable
                 }
             }
                 
-                else //Not Multicast-----------------------------------------------if receive NAK! Implement in here 
+                else //Not Multicast-----------------------------------------------if receive NAK, then resend. Implement in here 
                 {
                     //System.out.println("Action is:"+action);
                     try
