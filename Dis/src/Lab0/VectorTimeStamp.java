@@ -76,6 +76,9 @@ public class VectorTimeStamp extends TimeStamp{
 			return true;
 		return false;
 	}
+	
+	
+	
 	public String toString(){
 		StringBuffer str = new StringBuffer("");
 		for(Map.Entry<String, Integer> item : stamp.entrySet()){
