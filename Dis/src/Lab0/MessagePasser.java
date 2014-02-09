@@ -171,7 +171,7 @@ public class MessagePasser implements Runnable
     void send(TimeStampedMessage m1)
     {
     	
-    	TimeStampedMessage m = new TimeStampedMessage(m1.destination, m1.kind, m1.data, null, m1.isMulticast, m1.multicastSeq, m1.lastSeqFromMembers);
+    	TimeStampedMessage m = new TimeStampedMessage(m1.destination, m1.kind, m1.data, null, m1.isMulticast, m1.multicastGroup, m1.multicastSeq, m1.lastSeqFromMembers);
         try
         {
             //Code to check rules and send data
@@ -259,7 +259,7 @@ public class MessagePasser implements Runnable
                 {
                     //System.out.println("Message duplicated!");
                     TimeStampedMessage duplicate_message = new TimeStampedMessage(m.destination,
-                            m.kind,m.data, null, m.isMulticast, m.multicastSeq, m.lastSeqFromMembers);
+                            m.kind,m.data, null, m.isMulticast, m.multicastGroup, m.multicastSeq, m.lastSeqFromMembers);
                     switch (clock_type)
                     {
                     case "Vector":
@@ -354,7 +354,7 @@ public class MessagePasser implements Runnable
         {
             if(received_queue.isEmpty())
             {
-                message = new TimeStampedMessage("NULL","NULL","NULL", null, false, -1, null);
+                message = new TimeStampedMessage("NULL","NULL","NULL", null, false, null, -1, null);
             }
             else
             {
@@ -527,7 +527,7 @@ class OurRunnable implements Runnable
                         //System.out.println("Received message duplicated!");
                         TimeStampedMessage duplicate_message = 
                                 new TimeStampedMessage(message.destination,
-						        message.kind,message.data, message.ts, message.isMulticast, message.multicastSeq, message.lastSeqFromMembers);
+						        message.kind,message.data, message.ts, message.isMulticast, message.multicastGroup, message.multicastSeq, message.lastSeqFromMembers);
                         duplicate_message.set_source(message.source);
                         duplicate_message.set_seqNum(message.seqNum);
                         duplicate_message.set_duplicate(true);
