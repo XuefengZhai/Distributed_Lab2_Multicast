@@ -6,10 +6,10 @@ configuration :
   ip   : 127.0.0.1
   port : 8082
 - name : charlie
-  ip   : 128.237.208.193
+  ip   : 127.0.0.1
   port : 8083
 - name : daphnie
-  ip   : 128.237.208.193
+  ip   : 127.0.0.1
   port : 8084
 - name : fred
   ip   : 127.0.0.1

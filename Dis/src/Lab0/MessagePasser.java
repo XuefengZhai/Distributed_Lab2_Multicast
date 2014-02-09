@@ -40,6 +40,7 @@ public class MessagePasser implements Runnable
     LinkedList<Message> delayed_send_queue=new LinkedList<Message>();
     LinkedList<Message> delayed_received_queue=new LinkedList<Message>();
     LinkedList<Message> received_queue=new LinkedList<Message>();
+    LinkedList<Message> holdback_queue=new LinkedList<Message>();
     Map<String,Socket> sendingMap;
     ArrayList<Message> send_delayed_queue;
     String conf_file,local_name, clock_type;
@@ -48,7 +49,10 @@ public class MessagePasser implements Runnable
     List<Map<String, Object>> conf;
     List<Map<String, Object>> sendRules;
     List<Map<String, Object>> recvRules;
+    
     List<Map<String, Object>> groups;
+    Map<String, Integer> selfSeqPerGroup;
+    Map<String, Map<String, Integer>> maxSeqPerGroupPerMember;
     
     Object lock = new Object();
     Clock clock;
@@ -68,6 +72,26 @@ public class MessagePasser implements Runnable
         conf = (List<Map<String, Object>>) map.get("configuration");
         sendRules = (List<Map<String, Object>>) map.get("sendRules");
         recvRules = (List<Map<String, Object>>) map.get("receiveRules");
+        
+        // Configure multicast groups only on startup
+        this.groups =  (List<Map<String, Object>>) map.get("groups");
+        
+        /* 
+         * Initialize multicast parameters
+         */
+        this.selfSeqPerGroup = new HashMap<String, Integer>();
+        this.maxSeqPerGroupPerMember = new HashMap<String, Map<String, Integer>>();
+        for(Map<String, Object> group:this.groups){
+        	// Initialize the sequence number for this process for each group
+        	this.selfSeqPerGroup.put((String)group.get("name"), 0);
+        	// Get all the members of the each group, and initialize the max seq. received from them to zero
+        	List<String> members = (List<String>) group.get("members");
+        	HashMap<String, Integer> maxSeqPerMember = new HashMap<String, Integer>();
+        	for(String member:members){
+        		maxSeqPerMember.put(member, 0);
+        	}
+        	maxSeqPerGroupPerMember.put((String)group.get("name"), maxSeqPerMember);
+        }
         
         List<String> nameList = new ArrayList<String>();
         
@@ -99,9 +123,44 @@ public class MessagePasser implements Runnable
         Thread t=new Thread(this);
         t.start();
     }
-    void send(Message m1)
+    /**
+     * sendMulticast - send message to a Multicast group, defined in the config. file 
+     * @param groupName
+     * @param message
+     */
+    @SuppressWarnings("unchecked")
+	void sendMulticast(String groupName, TimeStampedMessage multiMessage){
+      	
+    	// Get the group we want to send a message to
+    	Map<String, Object> group = null;
+    	for(Map<String, Object> groupIt:groups){
+    		if (groupIt.containsKey("name") && groupIt.get("name") == groupName){
+    			group = groupIt;
+    		}
+    	}
+    	
+    	// If no group matches, or the group has no members, return
+    	if (group == null || !group.containsKey("members"))
+    		return;
+    	List<String> members = (List<String>) group.get("members");
+    	if(members.size() <= 0)
+    		return;
+    	
+    	for(String member:members){
+    		multiMessage.destination = member;
+    		// Set message as multicast and assign seq number (group&process specific)
+    		multiMessage.isMulticast = true;
+    		multiMessage.multicastSeq = this.selfSeqPerGroup.get(groupName);
+    		this.selfSeqPerGroup.put(groupName, this.selfSeqPerGroup.get(groupName) + 1); // Increase local seq for the group
+    		send(multiMessage);
+    	}
+    	
+    	
+    }
+    void send(TimeStampedMessage m1)
     {
-    	TimeStampedMessage m = new TimeStampedMessage(m1.destination, m1.kind, m1.data, null);
+    	
+    	TimeStampedMessage m = new TimeStampedMessage(m1.destination, m1.kind, m1.data, null, m1.isMulticast, m1.multicastSeq, m1.lastSeqFromMembers);
         try
         {
             //Code to check rules and send data
@@ -189,7 +248,7 @@ public class MessagePasser implements Runnable
                 {
                     //System.out.println("Message duplicated!");
                     TimeStampedMessage duplicate_message = new TimeStampedMessage(m.destination,
-                            m.kind,m.data, null);
+                            m.kind,m.data, null, m.isMulticast, m.multicastSeq, m.lastSeqFromMembers);
                     switch (clock_type)
                     {
                     case "Vector":
@@ -261,7 +320,7 @@ public class MessagePasser implements Runnable
         {
             if(received_queue.isEmpty())
             {
-                message = new TimeStampedMessage("NULL","NULL","NULL", null);
+                message = new TimeStampedMessage("NULL","NULL","NULL", null, false, -1, null);
             }
             else
             {
@@ -283,98 +342,56 @@ public class MessagePasser implements Runnable
 	}
     }
     
-    public void sync_conf() throws DbxException, IOException
+    @SuppressWarnings("unchecked")
+	public void sync_conf() throws DbxException, IOException
     {
 	    Yaml yaml = new Yaml();
 	    Map map;
         String conf_rev = null;
         FileInputStream input;
-	
-        DbxRequestConfig dbxconfig=new DbxRequestConfig("DistributedConf",
-                Locale.getDefault().toString());
-        
-        /*DbxAppInfo appInfo = new DbxAppInfo("1gim5r5ec6v0ll4", "172qwxwjic68jyc");
-        DbxWebAuthNoRedirect webAuth = new DbxWebAuthNoRedirect(dbxconfig, appInfo);
-        String authorizeUrl = webAuth.start();
-        System.out.println("1. Go to: " + authorizeUrl);
-        System.out.println("2. Click \"Allow\" (you might have to log in first)");
-        System.out.println("3. Copy the authorization code.");
-        String code = new BufferedReader(new InputStreamReader(System.in)).readLine().trim();
-        DbxAuthFinish authFinish = webAuth.finish(code);
-        System.out.println(authFinish.accessToken.toString());*/
-        
+        DbxRequestConfig dbxconfig=new DbxRequestConfig("DistributedConf",Locale.getDefault().toString());
         String accessToken = "0MqvvF2iI4YAAAAAAAAAATtitP65UgYcVK2OKGue4CX_Zb4Dd3MC9lBtKi1IKVQc";
         DbxClient client = new DbxClient(dbxconfig, accessToken);
         System.out.println("Linked account: " + client.getAccountInfo().displayName);
-        //DbxClient client = new DbxClient(dbxconfig, accessToken);
-        
-//        File inputFile = new File("config.yaml");
-//        FileInputStream inputStream = new FileInputStream(inputFile);
-//        try {
-//            DbxEntry.File uploadedFile = client.uploadFile("/config.yaml",
-//                DbxWriteMode.add(), inputFile.length(), inputStream);
-//            System.out.println("Uploaded: " + uploadedFile.toString());
-//        } finally {
-//            inputStream.close();
-//        }
-        
         while (true) 
         {
             DbxEntry.WithChildren listing = 
                     client.getMetadataWithChildren("/");
-	
             DbxEntry db_conf = listing.children.get(0);
-		String conf_file_rev = db_conf.asFile().rev;
+            String conf_file_rev = db_conf.asFile().rev;
+			try{
+				Thread.sleep(500);
+			} 
+	        catch (InterruptedException e){
+	        	e.printStackTrace();
+			}
+			if (!conf_file_rev.equals(conf_rev)){
+				
+				//System.out.println("Configuration file updated!");
+                conf_rev = conf_file_rev;
 			
-		try 
+                FileOutputStream outputStream = 
+                        new FileOutputStream(conf_file);
+                try 
                 {
-                    Thread.sleep(500);
-		} 
-                catch (InterruptedException e) 
+                	client.getFile("/config.yaml", null, outputStream);
+                }
+                finally 
                 {
-                    e.printStackTrace();
-		}
+                    outputStream.close();
+                }
 			
-		if (!conf_file_rev.equals(conf_rev)) 
-                {
-				
-                    //System.out.println("Configuration file updated!");
-                    conf_rev = conf_file_rev;
-				
-                    FileOutputStream outputStream = 
-                            new FileOutputStream(conf_file);
-                    try 
-                    {
-			client.getFile("/config.yaml", null, outputStream);
-                    }
-                    finally 
-                    {
-                        outputStream.close();
-                    }
-				
-                    input = new FileInputStream(new File(conf_file));
-                    map = (Map) yaml.load(input);
-                    input.close();
-				
-                    conf = (List<Map<String, Object>>) map.get("configuration");
-                    sendRules = (List<Map<String, Object>>)map.get("sendRules");
-                    recvRules = (List<Map<String, Object>>) 
-                            map.get("receiveRules");
-                    groups =  (List<Map<String, Object>>) map.get("groups");
-                    for (Map<String, Object> group:groups) 
-                    {
-                    	if(group.containsKey("name"))
-                    		System.out.println(group.get("name"));
-                    	if(group.containsKey("members")){
-                    		List<String> members = (List<String>) group.get("members");
-                    		for(String member:members){
-                    			System.out.println(member);
-                    		}
-                    	}
-                    }
-		}
-            }
-      }
+                input = new FileInputStream(new File(conf_file));
+                map = (Map) yaml.load(input);
+                input.close();
+			
+                conf = (List<Map<String, Object>>) map.get("configuration");
+                sendRules = (List<Map<String, Object>>)map.get("sendRules");
+                recvRules = (List<Map<String, Object>>)map.get("receiveRules");
+                
+			}
+        }
+    }
 }
 
 class Socket_Listener implements Runnable
@@ -472,7 +489,7 @@ class OurRunnable implements Runnable
                         //System.out.println("Received message duplicated!");
                         TimeStampedMessage duplicate_message = 
                                 new TimeStampedMessage(message.destination,
-						        message.kind,message.data, message.ts);
+						        message.kind,message.data, message.ts, message.isMulticast, message.multicastSeq, message.lastSeqFromMembers);
                         duplicate_message.set_source(message.source);
                         duplicate_message.set_seqNum(message.seqNum);
                         duplicate_message.set_duplicate(true);
