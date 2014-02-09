@@ -36,6 +36,7 @@ public class MessagePasser implements Runnable
     LinkedList<Message> delayed_send_queue=new LinkedList<Message>();
     LinkedList<Message> delayed_received_queue=new LinkedList<Message>();
     LinkedList<Message> received_queue=new LinkedList<Message>();
+    LinkedList<Message> holdback_queue = new LinkedList<Message>();
     Map<String,Socket> sendingMap;
     ArrayList<Message> send_delayed_queue;
     String conf_file,local_name, clock_type;
@@ -220,7 +221,7 @@ public class MessagePasser implements Runnable
                     
                 else if(action.equals("send"))
                 {
-                    System.out.println("Message sent!");
+                    //System.out.println("Message sent!");
                     oos=new ObjectOutputStream(s.getOutputStream());
                     oos.writeObject(m);
                     //System.out.println("Object written");
@@ -444,7 +445,10 @@ class OurRunnable implements Runnable
             {
                 ois = new ObjectInputStream(s.getInputStream());
                 TimeStampedMessage message = (TimeStampedMessage)ois.readObject();
+                
                 //System.out.println(message.data);
+                //System.out.println(message.kind);
+                
                 String action="receive";
                 String src = message.source;
                 String kind = message.kind;
@@ -467,6 +471,9 @@ class OurRunnable implements Runnable
                     break;
                 }
                 
+                
+                if(kind.equals("multicast"))
+                {
                 //System.out.println("Action is:"+action);
                 try
                 {
@@ -537,11 +544,87 @@ class OurRunnable implements Runnable
                     System.out.println("The receiver has terminated!");
                 }
             }
+                else //Not Multicast 
+                {
+                    //System.out.println("Action is:"+action);
+                    try
+                    {
+                        if(action.equals("drop"))
+                        {
+                            //System.out.println("Received message dropped!");
+                        }
+
+                        else if(action.equals("delay"))
+                        {
+                            //System.out.println("Received message delayed!");
+                            synchronized(mp1.lock)
+                            {
+                                mp1.delayed_received_queue.addLast(message);
+                            }
+                        }
+
+                        else if(action.equals("duplicate"))
+                        {
+                            //System.out.println("Received message duplicated!");
+                            TimeStampedMessage duplicate_message = 
+                                    new TimeStampedMessage(message.destination,
+    						        message.kind,message.data, message.ts);
+                            duplicate_message.set_source(message.source);
+                            duplicate_message.set_seqNum(message.seqNum);
+                            duplicate_message.set_duplicate(true);
+                            synchronized(mp1.lock)
+                            {
+                                mp1.received_queue.addLast(message);
+                                mp1.clock.update(message.ts);
+                                mp1.clock.increase(mp1.local_name);
+                                mp1.received_queue.addLast(duplicate_message);
+                                mp1.clock.update(duplicate_message.ts);
+                                mp1.clock.increase(mp1.local_name);
+                                while(!mp1.delayed_received_queue.isEmpty())
+                                {
+                                    //System.out.println("One delayed messaged received");
+                                    Message m = mp1.delayed_received_queue.pop();
+                                    mp1.received_queue.addLast(m);
+                                }
+                            }
+                        }
+
+                        else if(action.equals("receive"))
+                        {
+                            synchronized(mp1.lock)
+                            {
+                            	mp1.clock.update(message.ts);
+                            	mp1.clock.increase(mp1.local_name);
+                                mp1.received_queue.addLast(message);
+                                while(!mp1.delayed_received_queue.isEmpty())
+                                {
+                                    TimeStampedMessage m = (TimeStampedMessage) mp1.delayed_received_queue.pop();
+                                    mp1.clock.update(m.ts);
+                                    mp1.clock.increase(mp1.local_name);
+                                    mp1.received_queue.addLast(m);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            System.out.println("Invalid action specified! "
+                                    + "Cannot handle message");
+                        }
+                    }
+                    catch(Exception e)
+                    {
+                        System.out.println("The receiver has terminated!");
+                    }                
+               }
+            }
         } 
         catch (Exception ex) 
         {
             System.out.println("The other user has terminated!");
             System.exit(1);
         }
+        
+        
+        
     }
 }
