@@ -534,7 +534,7 @@ class OurRunnable implements Runnable
                 }
                 
                 
-                if(kind.equals("multicast"))
+                if(kind.equals("multicast")) //If multicast----------------------------------1. put in hold back queue 2. check if reliable if not send NACK 3. causal order 4 deliver
                 {
                 //System.out.println("Action is:"+action);
                 try
@@ -606,7 +606,8 @@ class OurRunnable implements Runnable
                     System.out.println("The receiver has terminated!");
                 }
             }
-                else //Not Multicast 
+                
+                else //Not Multicast-----------------------------------------------if receive NAK! Implement in here 
                 {
                     //System.out.println("Action is:"+action);
                     try
