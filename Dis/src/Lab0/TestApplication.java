@@ -48,7 +48,7 @@ public class TestApplication
                     String k=br.readLine();
                     System.out.println("Enter data:");
                     String s=br.readLine();
-                    Message m=new Message(d,k,(Object)s);
+                    TimeStampedMessage m=new TimeStampedMessage(d,k,(Object)s, null);
                     //System.out.println("Sending messages:");
                     mp.send(m);
                     break;
