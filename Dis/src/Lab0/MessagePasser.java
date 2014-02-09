@@ -324,6 +324,29 @@ public class MessagePasser implements Runnable
             System.out.println("Excdeption in sending:" + e);
         }
     }
+    
+    void processMulticast(TimeStampedMessage m){
+    	if (m.kind.equals("NACK")){
+    		
+    	}
+    	else{
+    		/* 
+    		{
+    			if(+1 Greatest Seq)
+    			deliver
+    			checkhold back queue
+    			else if(<=GS)
+    			drop
+    			else
+    			{
+    				put in the holdback queue
+    				sort
+    			}
+    		}
+    		*/
+    	}
+    }
+    
     TimeStampedMessage receive( )
     {
         TimeStampedMessage message;
@@ -441,6 +464,8 @@ class OurRunnable implements Runnable
     MessagePasser mp1;
     LinkedList<Message> delayed_received_queue;
     LinkedList<Message> received_queue;
+    LinkedList<Message> holdback_queue;
+
     public OurRunnable(Socket ss,MessagePasser mp1)
     {
         s=ss;
@@ -453,6 +478,8 @@ class OurRunnable implements Runnable
         {
             while(true)
             {
+            	
+            	
                 ois = new ObjectInputStream(s.getInputStream());
                 TimeStampedMessage message = (TimeStampedMessage)ois.readObject();
                 //System.out.println(message.data);
@@ -548,6 +575,8 @@ class OurRunnable implements Runnable
                     System.out.println("The receiver has terminated!");
                 }
             }
+            
+            
         } 
         catch (Exception ex) 
         {
