@@ -50,9 +50,11 @@ public class MessagePasser implements Runnable
     List<Map<String, Object>> sendRules;
     List<Map<String, Object>> recvRules;
     
+    // Multicast specific parameters
     List<Map<String, Object>> groups;
     Map<String, Integer> selfSeqPerGroup;
     Map<String, Map<String, Integer>> maxSeqPerGroupPerMember;
+    ArrayList<TimeStampedMessage> multicastRcvQueue; // Queue to hold the last 20 received messages
     
     Object lock = new Object();
     Clock clock;
@@ -92,6 +94,7 @@ public class MessagePasser implements Runnable
         	}
         	maxSeqPerGroupPerMember.put((String)group.get("name"), maxSeqPerMember);
         }
+        multicastRcvQueue = new ArrayList<TimeStampedMessage>();
         
         List<String> nameList = new ArrayList<String>();
         
@@ -153,11 +156,16 @@ public class MessagePasser implements Runnable
     		multiMessage.destination = member;
     		// Set message as multicast and assign seq number (group&process specific)
     		multiMessage.isMulticast = true;
-    		multiMessage.multicastSeq = this.selfSeqPerGroup.get(groupName);
     		this.selfSeqPerGroup.put(groupName, this.selfSeqPerGroup.get(groupName) + 1); // Increase local seq for the group
+    		multiMessage.multicastSeq = this.selfSeqPerGroup.get(groupName);
+    		multiMessage.lastSeqFromMembers = this.maxSeqPerGroupPerMember.get(groupName);
     		send(multiMessage);
+    		
     	}
     	
+    	
+    }
+    void resendMulticast(){
     	
     }
     void send(TimeStampedMessage m1)
