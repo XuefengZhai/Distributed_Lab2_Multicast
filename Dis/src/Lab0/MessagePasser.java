@@ -134,18 +134,21 @@ public class MessagePasser implements Runnable
     	// Get the group we want to send a message to
     	Map<String, Object> group = null;
     	for(Map<String, Object> groupIt:groups){
-    		if (groupIt.containsKey("name") && groupIt.get("name") == groupName){
+    		if (groupIt.containsKey("name") && groupIt.get("name").equals(groupName)){
     			group = groupIt;
     		}
     	}
-    	
     	// If no group matches, or the group has no members, return
     	if (group == null || !group.containsKey("members"))
+    	{
     		return;
+    	}
     	List<String> members = (List<String>) group.get("members");
     	if(members.size() <= 0)
+    	{	
     		return;
-    	
+    	}
+
     	for(String member:members){
     		multiMessage.destination = member;
     		// Set message as multicast and assign seq number (group&process specific)
