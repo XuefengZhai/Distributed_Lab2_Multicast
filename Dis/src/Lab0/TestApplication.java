@@ -37,7 +37,7 @@ public class TestApplication
         {
             System.out.println("What do you wanna do? 1.Send 2.Send Multicast 3.Receive 4.What is time? 0.End:");
             choice=scan.nextInt();
-            if(choice<0 || choice>3)
+            if(choice<0 || choice>4)
                 continue;
             switch(choice)
             {
@@ -51,6 +51,15 @@ public class TestApplication
                     Message m=new Message(d,k,(Object)s);
                     //System.out.println("Sending messages:");
                     mp.send(m);
+                    break;
+                    
+                case 2:
+                	System.out.println("Enter which group to send");
+                	String groupName =br.readLine();
+                    System.out.println("Enter data:");
+                    String data=br.readLine();
+                    Message multicastMsg=new Message(groupName,"multicast",(Object)data);
+                    mp.sendMulticast(multicastMsg);
                     break;
                 
                 case 3:
@@ -67,9 +76,11 @@ public class TestApplication
                         System.out.println("  timestamp:" + mem.ts.toString());
                     }
                     break;
+                    
                 case 4:
                 	System.out.println("Time is: " + mp.clock.getTime().toString());
                 	break;
+                	
                 case 0: System.exit(1);
                         break;
                     

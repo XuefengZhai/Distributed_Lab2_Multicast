@@ -31,10 +31,6 @@ import com.dropbox.core.DbxException;
 import com.dropbox.core.DbxRequestConfig;
 import com.dropbox.core.DbxWriteMode;
 
-/**
- *
- * @author Songzhe
- */
 public class MessagePasser implements Runnable
 { 
     LinkedList<Message> delayed_send_queue=new LinkedList<Message>();
@@ -68,6 +64,7 @@ public class MessagePasser implements Runnable
         conf = (List<Map<String, Object>>) map.get("configuration");
         sendRules = (List<Map<String, Object>>) map.get("sendRules");
         recvRules = (List<Map<String, Object>>) map.get("receiveRules");
+        groups = (List<Map<String, Object>>) map.get("groups");
         
         List<String> nameList = new ArrayList<String>();
         
@@ -171,23 +168,23 @@ public class MessagePasser implements Runnable
                 action = (String) rule.get("action");
                 break;
             }       
-            //System.out.println(action);
+            System.out.println(action);
             try
             {
                 if(action.equals("drop"))
                 {
-                    //System.out.println("Message dropped!");
+                    System.out.println("Message dropped!");
                 }
                     
                 else if(action.equals("delay"))
                 {
-                    //System.out.println("Message delayed!");
+                    System.out.println("Message delayed!");
                     delayed_send_queue.addLast(m);
                 }
                     
                 else if(action.equals("duplicate"))
                 {
-                    //System.out.println("Message duplicated!");
+                    System.out.println("Message duplicated!");
                     TimeStampedMessage duplicate_message = new TimeStampedMessage(m.destination,
                             m.kind,m.data, null);
                     switch (clock_type)
@@ -223,7 +220,7 @@ public class MessagePasser implements Runnable
                     
                 else if(action.equals("send"))
                 {
-                    //System.out.println("Message sent!");
+                    System.out.println("Message sent!");
                     oos=new ObjectOutputStream(s.getOutputStream());
                     oos.writeObject(m);
                     //System.out.println("Object written");
@@ -233,7 +230,7 @@ public class MessagePasser implements Runnable
                         s = sendingMap.get(delayed.destination);
                         oos = new ObjectOutputStream(s.getOutputStream());
                         oos.writeObject(delayed);
-                        //System.out.println("1 Delayed message written");
+                        //("1 Delayed message written");
                     }
                 }
                     
@@ -254,6 +251,32 @@ public class MessagePasser implements Runnable
             System.out.println("Excdeption in sending:" + e);
         }
     }
+    
+    void sendMulticast(Message m2){
+    	
+    	List<String> members = null;
+        for (Map<String, Object> group:groups) 
+        {
+        	if(group.containsKey("name") && (group.get("name").equals(m2.destination))){
+        		if(group.containsKey("members")){
+        		members = (List<String>) group.get("members");}
+        	}
+        	
+        	else
+        	{
+        	continue;
+        	}
+        }
+        
+        
+        for(String member:members){
+            Message readyMsg = new Message(member, m2.kind, m2.data);
+        	send(readyMsg);
+        }
+
+    	
+    }
+    
     TimeStampedMessage receive( )
     {
         TimeStampedMessage message;
@@ -273,17 +296,10 @@ public class MessagePasser implements Runnable
     }
     public void run()
     {	
-    	try 
-        {
-		sync_conf();
-	} 
-        catch (DbxException | IOException e) 
-        {
-		e.printStackTrace();
-	}
+       
     }
     
-    public void sync_conf() throws DbxException, IOException
+    public void sync_conf() 
     {
 	    Yaml yaml = new Yaml();
 	    Map map;
@@ -305,7 +321,7 @@ public class MessagePasser implements Runnable
         
         String accessToken = "0MqvvF2iI4YAAAAAAAAAATtitP65UgYcVK2OKGue4CX_Zb4Dd3MC9lBtKi1IKVQc";
         DbxClient client = new DbxClient(dbxconfig, accessToken);
-        System.out.println("Linked account: " + client.getAccountInfo().displayName);
+        //System.out.println("Linked account: " + client.getAccountInfo().displayName);
         //DbxClient client = new DbxClient(dbxconfig, accessToken);
         
 //        File inputFile = new File("config.yaml");
@@ -320,11 +336,11 @@ public class MessagePasser implements Runnable
         
         while (true) 
         {
-            DbxEntry.WithChildren listing = 
-                    client.getMetadataWithChildren("/");
+            //DbxEntry.WithChildren listing = 
+                   // client.getMetadataWithChildren("/");
 	
-            DbxEntry db_conf = listing.children.get(0);
-		String conf_file_rev = db_conf.asFile().rev;
+            //DbxEntry db_conf = listing.children.get(0);
+		//String conf_file_rev = db_conf.asFile().rev;
 			
 		try 
                 {
@@ -334,7 +350,7 @@ public class MessagePasser implements Runnable
                 {
                     e.printStackTrace();
 		}
-			
+			/*
 		if (!conf_file_rev.equals(conf_rev)) 
                 {
 				
@@ -358,9 +374,10 @@ public class MessagePasser implements Runnable
 				
                     conf = (List<Map<String, Object>>) map.get("configuration");
                     sendRules = (List<Map<String, Object>>)map.get("sendRules");
-                    recvRules = (List<Map<String, Object>>) 
-                            map.get("receiveRules");
+                    recvRules = (List<Map<String, Object>>)map.get("receiveRules");
                     groups =  (List<Map<String, Object>>) map.get("groups");
+                    */
+                    /*
                     for (Map<String, Object> group:groups) 
                     {
                     	if(group.containsKey("name"))
@@ -371,11 +388,11 @@ public class MessagePasser implements Runnable
                     			System.out.println(member);
                     		}
                     	}
-                    }
+                    }*/
 		}
             }
       }
-}
+//}
 
 class Socket_Listener implements Runnable
 {
