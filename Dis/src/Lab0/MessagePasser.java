@@ -523,7 +523,7 @@ public class MessagePasser implements Runnable
                 recvRules = (List<Map<String, Object>>)map.get("receiveRules");
                 
 			}
-			if(count % 30 == 0){
+			if(count % (120 * 5) == 0){
 				for(Map<String, Object> group:this.groups){
 					List<String> members = (List<String>)group.get("members");
 					boolean isInGroup = false;
