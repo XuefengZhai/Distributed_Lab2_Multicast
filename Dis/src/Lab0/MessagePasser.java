@@ -155,7 +155,7 @@ public class MessagePasser implements Runnable
     	}
     	
     	this.selfSeqPerGroup.put(groupName, this.selfSeqPerGroup.get(groupName) + 1); // Increase local seq for the group
-    	System.out.println("Multicast Sequence: " + this.selfSeqPerGroup.get(groupName));
+    	//System.out.println("Multicast Sequence: " + this.selfSeqPerGroup.get(groupName));
     	
     	for(String member:members){
     		multiMessage.destination = member;
@@ -337,7 +337,7 @@ public class MessagePasser implements Runnable
     	
     	if (m.kind.equals("NACK"))
     	{
-    		System.out.println("processing NACK\n");
+    		System.out.println("\nProcessing NACK from " + m.source + "\n");
     	    	String groupName = m.multicastGroup;
     		String src = m.source;
     		ArrayList<String> data =(ArrayList<String>) m.data;
@@ -374,13 +374,13 @@ public class MessagePasser implements Runnable
                 this.maxSeqPerGroupPerMember.get(m.multicastGroup).put(m.source, this.maxSeqPerGroupPerMember.get(m.multicastGroup).get(m.source) + 1); 
                 // Check holdback queue
                 
-                 for(TimeStampedMessage checkedMsg: holdback_queue){
-    			
-                if(checkedMsg.multicastSeq == maxSeqForGroupForSender +1)
-    				{
-    				clock.update(checkedMsg.ts);
-    				clock.increase(local_name);
-    				received_queue.add(checkedMsg);
+                for(TimeStampedMessage checkedMsg: holdback_queue){
+                	if(checkedMsg.multicastSeq == this.maxSeqPerGroupPerMember.get(checkedMsg.multicastGroup).get(checkedMsg.source) + 1){
+                		clock.update(checkedMsg.ts);
+                		clock.increase(local_name);
+                		received_queue.add(checkedMsg);
+                		this.maxSeqPerGroupPerMember.get(checkedMsg.multicastGroup).put(checkedMsg.source,
+                				this.maxSeqPerGroupPerMember.get(checkedMsg.multicastGroup).get(checkedMsg.source) + 1);
     				}
     			}
     		}

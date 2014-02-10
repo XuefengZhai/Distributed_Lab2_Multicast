@@ -19,6 +19,10 @@ configuration :
 # May be changed for further communication as usual
 
 sendRules :
+  - action : send
+    src : nobody
+
+receiveRules :
   - action : delay
     src : bob
     dest : alice
@@ -32,9 +36,6 @@ sendRules :
     dest : alice
     seqNum : 2
 
-receiveRules :
-  - action : send
-    src : nobody
 
 groups :
   - name: Group 1

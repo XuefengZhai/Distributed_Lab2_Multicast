@@ -74,10 +74,16 @@ public class TestApplication
                          System.out.println("No contents received");
                     }
                     else
-                    {
-                        System.out.println(mem.source+ ":" + mem.data+":"+mem.seqNum);
-                        // test
-                        System.out.println("  timestamp:" + mem.ts.toString());
+                    {	
+                    	System.out.println("SOM----------------------------------------------------");
+                        System.out.print("Source: " + mem.source + "\tSequenceNo:" + mem.seqNum + "\tIs-Multicast: " + mem.isMulticast);
+                        if(mem.isMulticast){
+                        	System.out.println("Multicast Group" + mem.multicastGroup);
+                        }
+                        System.out.println("Data:" + mem.data);
+                        
+                        System.out.println("Timestamp: " + mem.ts.toString());
+                        System.out.println("----------------------------------------------------EOM\n");
                     }
                     break;
                 case 4:
