@@ -17,6 +17,7 @@ import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -37,10 +38,10 @@ import com.dropbox.core.DbxWriteMode;
  */
 public class MessagePasser implements Runnable
 { 
-    LinkedList<Message> delayed_send_queue=new LinkedList<Message>();
-    LinkedList<Message> delayed_received_queue=new LinkedList<Message>();
-    LinkedList<Message> received_queue=new LinkedList<Message>();
-    LinkedList<Message> holdback_queue=new LinkedList<Message>();
+    LinkedList<TimeStampedMessage> delayed_send_queue=new LinkedList<TimeStampedMessage>();
+    LinkedList<TimeStampedMessage> delayed_received_queue=new LinkedList<TimeStampedMessage>();
+    LinkedList<TimeStampedMessage> received_queue=new LinkedList<TimeStampedMessage>();
+    LinkedList<TimeStampedMessage> holdback_queue=new LinkedList<TimeStampedMessage>();
     Map<String,Socket> sendingMap;
     ArrayList<Message> send_delayed_queue;
     String conf_file,local_name, clock_type;
@@ -92,7 +93,8 @@ public class MessagePasser implements Runnable
         	for(String member:members){
         		maxSeqPerMember.put(member, 0);
         	}
-        	maxSeqPerGroupPerMember.put((String)group.get("name"), maxSeqPerMember);
+        	String groupName = (String)group.get("name");
+        	maxSeqPerGroupPerMember.put(groupName, maxSeqPerMember);
         }
         multicastRcvQueue = new ArrayList<TimeStampedMessage>();
         
@@ -151,14 +153,19 @@ public class MessagePasser implements Runnable
     	{	
     		return;
     	}
-
+    	
+    	this.selfSeqPerGroup.put(groupName, this.selfSeqPerGroup.get(groupName) + 1); // Increase local seq for the group
+    	System.out.println("Multicast Sequence: " + this.selfSeqPerGroup.get(groupName));
+    	
     	for(String member:members){
     		multiMessage.destination = member;
     		// Set message as multicast and assign seq number (group&process specific)
     		multiMessage.isMulticast = true;
-    		this.selfSeqPerGroup.put(groupName, this.selfSeqPerGroup.get(groupName) + 1); // Increase local seq for the group
+    		
     		multiMessage.multicastSeq = this.selfSeqPerGroup.get(groupName);
+    		
     		multiMessage.lastSeqFromMembers = this.maxSeqPerGroupPerMember.get(groupName);
+    		multiMessage.multicastGroup = groupName;
     		send(multiMessage);
     		
     	}
@@ -171,7 +178,7 @@ public class MessagePasser implements Runnable
     void send(TimeStampedMessage m1)
     {
     	
-    	TimeStampedMessage m = new TimeStampedMessage(m1.destination, m1.kind, m1.data, null, m1.isMulticast, m1.multicastSeq, m1.lastSeqFromMembers);
+    	TimeStampedMessage m = new TimeStampedMessage(m1.destination, m1.kind, m1.data, null, m1.isMulticast, m1.multicastGroup, m1.multicastSeq, m1.lastSeqFromMembers);
         try
         {
             //Code to check rules and send data
@@ -259,7 +266,7 @@ public class MessagePasser implements Runnable
                 {
                     //System.out.println("Message duplicated!");
                     TimeStampedMessage duplicate_message = new TimeStampedMessage(m.destination,
-                            m.kind,m.data, null, m.isMulticast, m.multicastSeq, m.lastSeqFromMembers);
+                            m.kind,m.data, null, m.isMulticast, m.multicastGroup, m.multicastSeq, m.lastSeqFromMembers);
                     switch (clock_type)
                     {
                     case "Vector":
@@ -321,31 +328,79 @@ public class MessagePasser implements Runnable
         }
         catch(Exception e)
         {
-            System.out.println("Excdeption in sending:" + e);
+            //System.out.println("Excdeption in sending:" + e);
+        	e.printStackTrace();
         }
     }
     
     void processMulticast(TimeStampedMessage m){
-    	if (m.kind.equals("NACK")){
+    	
+    	if (m.kind.equals("NACK"))
+    	{
+    		System.out.println("processing NACK\n");
+    	    	String groupName = m.multicastGroup;
+    		String src = m.source;
+    		ArrayList<String> data =(ArrayList<String>) m.data;
+    		int groupSeq = Integer.parseInt(data.get(0));
+    		String sender = data.get(1);
     		
-    	}
-    	else{
-    		/* 
-    		{
-    			if(+1 Greatest Seq)
-    			deliver
-    			checkhold back queue
-    			else if(<=GS)
-    			drop
-    			else
-    			{
-    				put in the holdback queue
-    				sort
+    		
+    		for(TimeStampedMessage resendMsg : multicastRcvQueue){
+    			if(resendMsg.multicastGroup.equals(groupName) && resendMsg.multicastSeq == groupSeq && resendMsg.source.equals(sender)){
+    					resendMsg.destination = src;
+    					send(resendMsg);
     			}
     		}
-    		*/
+	
+    	}
+    	else{
+    		// Get the max seq number previously received by the current src
+    		int maxSeqForGroupForSender = this.maxSeqPerGroupPerMember.get(m.multicastGroup).get(m.source);
+    		
+    		// If seq number is less than max, we already got that message, discard
+    		if(m.multicastSeq <= maxSeqForGroupForSender){
+    			return;
+    		}
+    		
+    		// Message is reliable (seq = max + 1)
+    		else if(m.multicastSeq == maxSeqForGroupForSender + 1){
+    			clock.update(m.ts);
+            	clock.increase(local_name);
+                received_queue.addLast(m);
+                this.maxSeqPerGroupPerMember.get(m.multicastGroup).put(m.source, this.maxSeqPerGroupPerMember.get(m.multicastGroup).get(m.source) + 1); 
+                // Check holdback queue
+                
+                 for(TimeStampedMessage checkedMsg: holdback_queue){
+    			
+                if(checkedMsg.multicastSeq == maxSeqForGroupForSender +1)
+    				{
+    				clock.update(checkedMsg.ts);
+    				clock.increase(local_name);
+    				received_queue.add(checkedMsg);
+    				}
+    			}
+    		}
+    		
+    		
+    		// Put in holdback queue and request 
+    		else{
+    			this.holdback_queue.add(m);
+    			Collections.sort(this.holdback_queue, new MessageComparator());
+    			ArrayList<String> data = new ArrayList<String>();
+    			
+    			for(int i = maxSeqForGroupForSender + 1; i <  m.multicastSeq; i++){
+    				data.add(0, String.valueOf(i));
+    				data.add(1, m.source);
+    				TimeStampedMessage nack = new TimeStampedMessage(m.multicastGroup, "NACK", data, 
+        					this.clock.getTime(), true, m.multicastGroup, m.multicastSeq, null);
+    				sendMulticast(m.multicastGroup, nack);
+    			}
+    		}
+    		
+    		
     	}
     }
+    
     
     TimeStampedMessage receive( )
     {
@@ -354,7 +409,7 @@ public class MessagePasser implements Runnable
         {
             if(received_queue.isEmpty())
             {
-                message = new TimeStampedMessage("NULL","NULL","NULL", null, false, -1, null);
+                message = new TimeStampedMessage("NULL","NULL","NULL", null, false, null, -1, null);
             }
             else
             {
@@ -489,7 +544,7 @@ class OurRunnable implements Runnable
                 String dest = message.destination;
                 int seqNum = message.seqNum;
                 
-                /* check the rules for sending/recving */
+                /* check the rules for sending/receiving */
                 for (Map<String, Object> rule:mp1.recvRules) 
                 {         
                     if(rule.containsKey("src") && !rule.get("src").equals(src)||
@@ -527,23 +582,38 @@ class OurRunnable implements Runnable
                         //System.out.println("Received message duplicated!");
                         TimeStampedMessage duplicate_message = 
                                 new TimeStampedMessage(message.destination,
-						        message.kind,message.data, message.ts, message.isMulticast, message.multicastSeq, message.lastSeqFromMembers);
+						        message.kind,message.data, message.ts, message.isMulticast, message.multicastGroup, message.multicastSeq, message.lastSeqFromMembers);
                         duplicate_message.set_source(message.source);
                         duplicate_message.set_seqNum(message.seqNum);
                         duplicate_message.set_duplicate(true);
                         synchronized(mp1.lock)
                         {
-                            mp1.received_queue.addLast(message);
-                            mp1.clock.update(message.ts);
-                            mp1.clock.increase(mp1.local_name);
-                            mp1.received_queue.addLast(duplicate_message);
-                            mp1.clock.update(duplicate_message.ts);
-                            mp1.clock.increase(mp1.local_name);
+                            
+                            if(message.isMulticast){
+                            	mp1.processMulticast(duplicate_message);
+                            	mp1.processMulticast(message);
+                            }
+                            else{
+                            	mp1.received_queue.addLast(message);
+                                mp1.clock.update(message.ts);
+                                mp1.clock.increase(mp1.local_name);
+                            	mp1.received_queue.addLast(duplicate_message);
+                            	mp1.clock.update(duplicate_message.ts);
+                                mp1.clock.increase(mp1.local_name);
+                               
+                            }
+                           
                             while(!mp1.delayed_received_queue.isEmpty())
                             {
                                 //System.out.println("One delayed messaged received");
-                                Message m = mp1.delayed_received_queue.pop();
-                                mp1.received_queue.addLast(m);
+                                TimeStampedMessage m = mp1.delayed_received_queue.pop();
+                                if(m.isMulticast){
+                                	mp1.processMulticast(m);
+                                }
+                                else{
+                                	mp1.received_queue.addLast(m);
+                                }
+                                
                             }
                         }
                     }
@@ -552,15 +622,25 @@ class OurRunnable implements Runnable
                     {
                         synchronized(mp1.lock)
                         {
-                        	mp1.clock.update(message.ts);
-                        	mp1.clock.increase(mp1.local_name);
-                            mp1.received_queue.addLast(message);
+                        	if(message.isMulticast){
+                        		mp1.processMulticast(message);
+                        	}
+                        	else{
+	                        	mp1.clock.update(message.ts);
+	                        	mp1.clock.increase(mp1.local_name);
+	                            mp1.received_queue.addLast(message);
+                        	}
                             while(!mp1.delayed_received_queue.isEmpty())
                             {
                                 TimeStampedMessage m = (TimeStampedMessage) mp1.delayed_received_queue.pop();
-                                mp1.clock.update(m.ts);
-                                mp1.clock.increase(mp1.local_name);
-                                mp1.received_queue.addLast(m);
+                                if(m.isMulticast){
+                            		mp1.processMulticast(m);
+                            	}
+                                else{
+                                	mp1.clock.update(m.ts);
+                                	mp1.clock.increase(mp1.local_name);
+                                	mp1.received_queue.addLast(m);
+                                }
                             }
                         }
                     }
@@ -572,6 +652,7 @@ class OurRunnable implements Runnable
                 }
                 catch(Exception e)
                 {
+                	e.printStackTrace();
                     System.out.println("The receiver has terminated!");
                 }
             }
