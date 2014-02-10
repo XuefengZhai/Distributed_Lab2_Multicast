@@ -179,9 +179,12 @@ public class MessagePasser implements Runnable
     void send(TimeStampedMessage m1, int isResend)
     {
     	
+    
+    	
     	TimeStampedMessage m = new TimeStampedMessage(m1.destination, m1.kind, m1.data, m1.ts, m1.isMulticast, m1.multicastGroup, m1.multicastSeq, m1.lastSeqFromMembers);
     	m.originalSource = m1.originalSource;
-    	
+    	if(isResend == 1 )
+    		m.source = m1.source;
         try
         {
             //Code to check rules and send data
