@@ -153,13 +153,17 @@ public class MessagePasser implements Runnable
     	{	
     		return;
     	}
-
+    	
+    	this.selfSeqPerGroup.put(groupName, this.selfSeqPerGroup.get(groupName) + 1); // Increase local seq for the group
+    	System.out.println("Multicast Sequence: " + this.selfSeqPerGroup.get(groupName));
+    	
     	for(String member:members){
     		multiMessage.destination = member;
     		// Set message as multicast and assign seq number (group&process specific)
     		multiMessage.isMulticast = true;
-    		this.selfSeqPerGroup.put(groupName, this.selfSeqPerGroup.get(groupName) + 1); // Increase local seq for the group
+    		
     		multiMessage.multicastSeq = this.selfSeqPerGroup.get(groupName);
+    		
     		multiMessage.lastSeqFromMembers = this.maxSeqPerGroupPerMember.get(groupName);
     		multiMessage.multicastGroup = groupName;
     		send(multiMessage);
@@ -324,13 +328,16 @@ public class MessagePasser implements Runnable
         }
         catch(Exception e)
         {
-            System.out.println("Excdeption in sending:" + e);
+            //System.out.println("Excdeption in sending:" + e);
+        	e.printStackTrace();
         }
     }
     
     void processMulticast(TimeStampedMessage m){
+    	
     	if (m.kind.equals("NACK"))
     	{
+    		System.out.println("processing NACK\n");
     	    	String groupName = m.multicastGroup;
     		String src = m.source;
     		ArrayList<String> data =(ArrayList<String>) m.data;

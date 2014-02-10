@@ -19,10 +19,12 @@ configuration :
 # May be changed for further communication as usual
 
 sendRules :
-
+  - action : send
+    src : nobody
 
 receiveRules :
-
+  - action : send
+    src : nobody
 
 groups :
   - name: Group 1
