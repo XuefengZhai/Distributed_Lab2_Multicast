@@ -78,7 +78,7 @@ public class TestApplication
                     	System.out.println("SOM----------------------------------------------------");
                         System.out.print("Source: " + mem.source + "\tSequenceNo:" + mem.seqNum + "\tIs-Multicast: " + mem.isMulticast);
                         if(mem.isMulticast){
-                        	System.out.println("Multicast Group" + mem.multicastGroup);
+                        	System.out.println("\tMulticastGroup: " + mem.multicastGroup + "\tMulticast-Seq: " + mem.multicastSeq);
                         }
                         System.out.println("Data:" + mem.data);
                         
