@@ -1,8 +1,9 @@
 package Lab0;
 
+import java.io.Serializable;
 import java.util.Map;
 
-public class TimeStampedMessage extends Message {
+public class TimeStampedMessage extends Message implements Serializable {
 
 	TimeStamp ts;
 	public boolean isMulticast;

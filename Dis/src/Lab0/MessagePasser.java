@@ -93,7 +93,8 @@ public class MessagePasser implements Runnable
         	for(String member:members){
         		maxSeqPerMember.put(member, 0);
         	}
-        	maxSeqPerGroupPerMember.put((String)group.get("name"), maxSeqPerMember);
+        	String groupName = (String)group.get("name");
+        	maxSeqPerGroupPerMember.put(groupName, maxSeqPerMember);
         }
         multicastRcvQueue = new ArrayList<TimeStampedMessage>();
         
@@ -160,6 +161,7 @@ public class MessagePasser implements Runnable
     		this.selfSeqPerGroup.put(groupName, this.selfSeqPerGroup.get(groupName) + 1); // Increase local seq for the group
     		multiMessage.multicastSeq = this.selfSeqPerGroup.get(groupName);
     		multiMessage.lastSeqFromMembers = this.maxSeqPerGroupPerMember.get(groupName);
+    		multiMessage.multicastGroup = groupName;
     		send(multiMessage);
     		
     	}
@@ -643,6 +645,7 @@ class OurRunnable implements Runnable
                 }
                 catch(Exception e)
                 {
+                	e.printStackTrace();
                     System.out.println("The receiver has terminated!");
                 }
             }
