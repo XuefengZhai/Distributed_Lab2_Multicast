@@ -50,7 +50,7 @@ public class TestApplication
                     String s=br.readLine();
                     TimeStampedMessage m=new TimeStampedMessage(d,k,(Object)s, null);
                     //System.out.println("Sending messages:");
-                    mp.send(m);
+                    mp.send(m,0);
                     break;
                 
                 case 2:
