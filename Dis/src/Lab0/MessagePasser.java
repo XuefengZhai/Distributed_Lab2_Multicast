@@ -375,11 +375,11 @@ public class MessagePasser implements Runnable
     			clock.update(m.ts);
             	clock.increase(local_name);
                 received_queue.addLast(m);
-                this.maxSeqPerGroupPerMember.get(m.multicastGroup).put(m.source, this.maxSeqPerGroupPerMember.get(m.multicastGroup).get(m.source) + 1); 
+                this.maxSeqPerGroupPerMember.get(m.multicastGroup).put(m.originalSource, this.maxSeqPerGroupPerMember.get(m.multicastGroup).get(m.originalSource) + 1); 
                 // Check holdback queue
                 
                 for(TimeStampedMessage checkedMsg: holdback_queue){
-                	if(checkedMsg.multicastSeq == this.maxSeqPerGroupPerMember.get(checkedMsg.multicastGroup).get(checkedMsg.source) + 1){
+                	if(checkedMsg.multicastSeq == this.maxSeqPerGroupPerMember.get(checkedMsg.multicastGroup).get(checkedMsg.originalSource) + 1){
                 		clock.update(checkedMsg.ts);
                 		clock.increase(local_name);
                 		received_queue.add(checkedMsg);
@@ -402,12 +402,36 @@ public class MessagePasser implements Runnable
     			
     			for(int i = maxSeqForGroupForSender + 1; i <  m.multicastSeq; i++){
     				data.add(0, String.valueOf(i));
-    				data.add(1, m.source);
+    				data.add(1, m.originalSource); // check original source...NOT SURE
     				TimeStampedMessage nack = new TimeStampedMessage(m.multicastGroup, "NACK", data, 
         					this.clock.getTime(), true, m.multicastGroup, m.multicastSeq, null);
     				sendMulticast(m.multicastGroup, nack);
     			}
     		}
+    		
+    		Map<String, Integer> externalMaxSeqPerNodes = m.lastSeqFromMembers;
+    		
+    		
+    		ArrayList<String> data = new ArrayList<String>();
+    		for(String key:externalMaxSeqPerNodes.keySet()){
+    			// For all the nodes except from2 the one which sent the message (because we already covered that)
+    			if(!key.equals(m.originalSource) && !key.equals(this.local_name)){
+    				// Send NACKS for missing messages
+    				int currMaxSeqPerNode = maxSeqPerGroupPerMember.get(m.multicastGroup).get(key);
+	    			for(int i = currMaxSeqPerNode + 1; i <  externalMaxSeqPerNodes.get(key); i++){
+	    				data.add(0, String.valueOf(i));
+	    				data.add(1, key);
+	    				TimeStampedMessage nack = new TimeStampedMessage(m.multicastGroup, "NACK", data, 
+	        					this.clock.getTime(), true, m.multicastGroup, m.multicastSeq, null);
+	    				
+	    				sendMulticast(m.multicastGroup, nack);
+	    			}
+	    			
+    			}
+    		}
+    		
+    	    	
+        	
     		
     		
     	}

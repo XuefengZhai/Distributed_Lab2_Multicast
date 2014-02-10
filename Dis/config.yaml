@@ -47,18 +47,6 @@ receiveRules :
     src : bob
     dest : alice
     seqNum : 5
-  - action : drop
-    src : bob
-    dest : alice
-    seqNum : 6
-  - action : drop
-    src : bob
-    dest : alice
-    seqNum : 7
-  - action : drop
-    src : bob
-    dest : alice
-    seqNum : 8
 
 
 groups :
