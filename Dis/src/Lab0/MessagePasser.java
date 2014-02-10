@@ -328,7 +328,20 @@ public class MessagePasser implements Runnable
     
     void processMulticast(TimeStampedMessage m){
     	if (m.kind.equals("NACK")){
+    	    	String groupName = m.multicastGroup;
+    		String src = m.source;
+    		ArrayList<String> data =(ArrayList<String>) m.data;
+    		int groupSeq = Integer.parseInt(data.get(0));
+    		String sender = data.get(1);
     		
+    		
+    		for(TimeStampedMessage resendMsg : multicastRcvQueue){
+    			if(resendMsg.multicastGroup.equals(groupName) && resendMsg.multicastSeq == groupSeq && resendMsg.source.equals(sender)){
+    					resendMsg.destination = src;
+    					send(resendMsg);
+    			}
+    		}
+	
     	}
     	else{
     		// Get the max seq number previously received by the current src
@@ -347,7 +360,14 @@ public class MessagePasser implements Runnable
                 this.maxSeqPerGroupPerMember.get(m.multicastGroup).put(m.source, this.maxSeqPerGroupPerMember.get(m.multicastGroup).get(m.source) + 1); 
                 // Check holdback queue
                 
-    		}
+                  	for(TimeStampedMessage checkedMsg: holdback_queue){
+    			if(check.multicastSeq == maxSeqForGroupForSender +1)
+    				{
+    				clock.update(check.ts);
+    				clock.increase(local_name);
+    				received_queue.add(checkedMsg)
+    				}
+    			}
     		
     		// Put in holdback queue and request 
     		else{
