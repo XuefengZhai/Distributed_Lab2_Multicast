@@ -422,7 +422,11 @@ public class MessagePasser implements Runnable
     			if(!key.equals(m.originalSource) && !key.equals(this.local_name)){
     				// Send NACKS for missing messages
     				int currMaxSeqPerNode = maxSeqPerGroupPerMember.get(m.multicastGroup).get(key);
+<<<<<<< HEAD
 	    			for(int i = currMaxSeqPerNode + 1; i <=  externalMaxSeqPerNodes.get(key); i++){
+=======
+	    			for(int i = currMaxSeqPerNode + 1; i <= externalMaxSeqPerNodes.get(key); i++){
+>>>>>>> Armando
 	    				data.add(0, String.valueOf(i));
 	    				data.add(1, key);
 	    				TimeStampedMessage nack = new TimeStampedMessage(m.multicastGroup, "NACK", data, 
