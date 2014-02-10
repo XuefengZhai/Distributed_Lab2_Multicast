@@ -364,6 +364,10 @@ public class MessagePasser implements Runnable
     		
     		// Message is reliable (seq = max + 1)
     		else if(m.multicastSeq == maxSeqForGroupForSender + 1){
+    			if(multicastRcvQueue.size() > 20)
+    				multicastRcvQueue.remove(0);
+    			multicastRcvQueue.add(m);
+    			
     			clock.update(m.ts);
             	clock.increase(local_name);
                 received_queue.addLast(m);
@@ -384,6 +388,10 @@ public class MessagePasser implements Runnable
     		
     		// Put in holdback queue and request 
     		else{
+    			if(multicastRcvQueue.size() > 20)
+    				multicastRcvQueue.remove(0);
+    			multicastRcvQueue.add(m);
+    			
     			this.holdback_queue.add(m);
     			Collections.sort(this.holdback_queue, new MessageComparator());
     			ArrayList<String> data = new ArrayList<String>();

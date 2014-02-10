@@ -19,8 +19,18 @@ configuration :
 # May be changed for further communication as usual
 
 sendRules :
-  - action : send
-    src : nobody
+  - action : delay
+    src : bob
+    dest : alice
+    seqNum : 0
+  - action : delay
+    src : bob
+    dest : alice
+    seqNum : 1
+  - action : delay
+    src : bob
+    dest : alice
+    seqNum : 2
 
 receiveRules :
   - action : send
