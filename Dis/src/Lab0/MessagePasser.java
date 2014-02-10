@@ -167,7 +167,7 @@ public class MessagePasser implements Runnable
     		multiMessage.lastSeqFromMembers = this.maxSeqPerGroupPerMember.get(groupName);
     		multiMessage.multicastGroup = groupName;
     		multiMessage.originalSource = this.local_name;
-    		send(multiMessage);
+    		send(multiMessage,0);
     		
     	}
     	
@@ -176,11 +176,12 @@ public class MessagePasser implements Runnable
     void resendMulticast(){
     	
     }
-    void send(TimeStampedMessage m1)
+    void send(TimeStampedMessage m1, int isResend)
     {
     	
-    	TimeStampedMessage m = new TimeStampedMessage(m1.destination, m1.kind, m1.data, null, m1.isMulticast, m1.multicastGroup, m1.multicastSeq, m1.lastSeqFromMembers);
+    	TimeStampedMessage m = new TimeStampedMessage(m1.destination, m1.kind, m1.data, m1.ts, m1.isMulticast, m1.multicastGroup, m1.multicastSeq, m1.lastSeqFromMembers);
     	m.originalSource = m1.originalSource;
+    	
         try
         {
             //Code to check rules and send data
@@ -220,7 +221,7 @@ public class MessagePasser implements Runnable
             }
             
             clock.increase(local_name);
-            
+            if(isResend == 0){
             switch (clock_type)
             {
             case "Vector":
@@ -235,7 +236,7 @@ public class MessagePasser implements Runnable
             	break;
             }
             System.out.println("  timestamp:" + m.ts.toString());
-            
+            }
             //System.out.println("Socket s initialized");
             ObjectOutputStream oos;
             /* check the rules for sending/recving */
@@ -270,6 +271,8 @@ public class MessagePasser implements Runnable
                     TimeStampedMessage duplicate_message = new TimeStampedMessage(m.destination,
                             m.kind,m.data, null, m.isMulticast, m.multicastGroup, m.multicastSeq, m.lastSeqFromMembers);
                     m.originalSource = m1.originalSource;
+                    
+                    if(isResend == 0){
                     switch (clock_type)
                     {
                     case "Vector":
@@ -282,6 +285,7 @@ public class MessagePasser implements Runnable
                     	break;
                     default:
                     	break;
+                    }
                     }
                     duplicate_message.set_source(src);
                     duplicate_message.set_seqNum(seqNum);
@@ -352,7 +356,7 @@ public class MessagePasser implements Runnable
     			if(resendMsg.multicastGroup.equals(groupName) && resendMsg.multicastSeq == groupSeq && resendMsg.source.equals(sender)){
     					resendMsg.destination = src;
     					
-    					send(resendMsg);
+    					send(resendMsg,1);
     			}
     		}
 	
@@ -418,7 +422,7 @@ public class MessagePasser implements Runnable
     			if(!key.equals(m.originalSource) && !key.equals(this.local_name)){
     				// Send NACKS for missing messages
     				int currMaxSeqPerNode = maxSeqPerGroupPerMember.get(m.multicastGroup).get(key);
-	    			for(int i = currMaxSeqPerNode + 1; i <  externalMaxSeqPerNodes.get(key); i++){
+	    			for(int i = currMaxSeqPerNode + 1; i <=  externalMaxSeqPerNodes.get(key); i++){
 	    				data.add(0, String.valueOf(i));
 	    				data.add(1, key);
 	    				TimeStampedMessage nack = new TimeStampedMessage(m.multicastGroup, "NACK", data, 
