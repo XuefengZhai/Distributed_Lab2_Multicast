@@ -485,6 +485,7 @@ public class MessagePasser implements Runnable
         String accessToken = "0MqvvF2iI4YAAAAAAAAAATtitP65UgYcVK2OKGue4CX_Zb4Dd3MC9lBtKi1IKVQc";
         DbxClient client = new DbxClient(dbxconfig, accessToken);
         System.out.println("Linked account: " + client.getAccountInfo().displayName);
+        int count = 1;
         while (true) 
         {
             DbxEntry.WithChildren listing = 
@@ -522,6 +523,36 @@ public class MessagePasser implements Runnable
                 recvRules = (List<Map<String, Object>>)map.get("receiveRules");
                 
 			}
+			if(count % 30 == 0){
+				for(Map<String, Object> group:this.groups){
+					List<String> members = (List<String>)group.get("members");
+					boolean isInGroup = false;
+					for(String member:members){
+						if(member.equals(this.local_name)){
+							isInGroup = true;
+						}
+					}
+					if(isInGroup){
+					Map<String, Integer> externalMaxSeqPerNodes = maxSeqPerGroupPerMember.get(group.get("name"));    		
+		    		ArrayList<String> data = new ArrayList<String>();
+		    		for(String key: externalMaxSeqPerNodes.keySet()){
+		    			if(!key.equals(this.local_name)){
+		    			// Send NACKS to check if we're misssing a message
+	    				data.add(0, String.valueOf(externalMaxSeqPerNodes.get(key)));
+	    				data.add(1, key);
+	    				TimeStampedMessage nack = new TimeStampedMessage((String)group.get("name"), "NACK", data, 
+	        					this.clock.getTime(), true, (String)group.get("name"),0, null);
+	    				
+	    				sendMulticast((String)group.get("name"), nack);
+			    			
+			    			
+		    			}
+		    		}
+					}
+				}
+				count = 1;
+			}
+			count++;
         }
     }
 }
