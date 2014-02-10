@@ -155,7 +155,7 @@ public class MessagePasser implements Runnable
     	}
     	
     	this.selfSeqPerGroup.put(groupName, this.selfSeqPerGroup.get(groupName) + 1); // Increase local seq for the group
-    	System.out.println("Multicast Sequence: " + this.selfSeqPerGroup.get(groupName));
+    	//System.out.println("Multicast Sequence: " + this.selfSeqPerGroup.get(groupName));
     	
     	for(String member:members){
     		multiMessage.destination = member;
@@ -166,7 +166,8 @@ public class MessagePasser implements Runnable
     		
     		multiMessage.lastSeqFromMembers = this.maxSeqPerGroupPerMember.get(groupName);
     		multiMessage.multicastGroup = groupName;
-    		send(multiMessage);
+    		multiMessage.originalSource = this.local_name;
+    		send(multiMessage,0);
     		
     	}
     	
@@ -175,10 +176,12 @@ public class MessagePasser implements Runnable
     void resendMulticast(){
     	
     }
-    void send(TimeStampedMessage m1)
+    void send(TimeStampedMessage m1, int isResend)
     {
     	
-    	TimeStampedMessage m = new TimeStampedMessage(m1.destination, m1.kind, m1.data, null, m1.isMulticast, m1.multicastGroup, m1.multicastSeq, m1.lastSeqFromMembers);
+    	TimeStampedMessage m = new TimeStampedMessage(m1.destination, m1.kind, m1.data, m1.ts, m1.isMulticast, m1.multicastGroup, m1.multicastSeq, m1.lastSeqFromMembers);
+    	m.originalSource = m1.originalSource;
+    	
         try
         {
             //Code to check rules and send data
@@ -218,7 +221,7 @@ public class MessagePasser implements Runnable
             }
             
             clock.increase(local_name);
-            
+            if(isResend == 0){
             switch (clock_type)
             {
             case "Vector":
@@ -233,7 +236,7 @@ public class MessagePasser implements Runnable
             	break;
             }
             System.out.println("  timestamp:" + m.ts.toString());
-            
+            }
             //System.out.println("Socket s initialized");
             ObjectOutputStream oos;
             /* check the rules for sending/recving */
@@ -267,6 +270,9 @@ public class MessagePasser implements Runnable
                     //System.out.println("Message duplicated!");
                     TimeStampedMessage duplicate_message = new TimeStampedMessage(m.destination,
                             m.kind,m.data, null, m.isMulticast, m.multicastGroup, m.multicastSeq, m.lastSeqFromMembers);
+                    m.originalSource = m1.originalSource;
+                    
+                    if(isResend == 0){
                     switch (clock_type)
                     {
                     case "Vector":
@@ -279,6 +285,7 @@ public class MessagePasser implements Runnable
                     	break;
                     default:
                     	break;
+                    }
                     }
                     duplicate_message.set_source(src);
                     duplicate_message.set_seqNum(seqNum);
@@ -337,7 +344,7 @@ public class MessagePasser implements Runnable
     	
     	if (m.kind.equals("NACK"))
     	{
-    		System.out.println("processing NACK\n");
+    		System.out.println("\nProcessing NACK from " + m.source + "\n");
     	    	String groupName = m.multicastGroup;
     		String src = m.source;
     		ArrayList<String> data =(ArrayList<String>) m.data;
@@ -348,14 +355,15 @@ public class MessagePasser implements Runnable
     		for(TimeStampedMessage resendMsg : multicastRcvQueue){
     			if(resendMsg.multicastGroup.equals(groupName) && resendMsg.multicastSeq == groupSeq && resendMsg.source.equals(sender)){
     					resendMsg.destination = src;
-    					send(resendMsg);
+    					
+    					send(resendMsg,1);
     			}
     		}
 	
     	}
     	else{
     		// Get the max seq number previously received by the current src
-    		int maxSeqForGroupForSender = this.maxSeqPerGroupPerMember.get(m.multicastGroup).get(m.source);
+    		int maxSeqForGroupForSender = this.maxSeqPerGroupPerMember.get(m.multicastGroup).get(m.originalSource);
     		
     		// If seq number is less than max, we already got that message, discard
     		if(m.multicastSeq <= maxSeqForGroupForSender){
@@ -364,19 +372,23 @@ public class MessagePasser implements Runnable
     		
     		// Message is reliable (seq = max + 1)
     		else if(m.multicastSeq == maxSeqForGroupForSender + 1){
+    			if(multicastRcvQueue.size() > 20)
+    				multicastRcvQueue.remove(0);
+    			multicastRcvQueue.add(m);
+    			
     			clock.update(m.ts);
             	clock.increase(local_name);
                 received_queue.addLast(m);
-                this.maxSeqPerGroupPerMember.get(m.multicastGroup).put(m.source, this.maxSeqPerGroupPerMember.get(m.multicastGroup).get(m.source) + 1); 
+                this.maxSeqPerGroupPerMember.get(m.multicastGroup).put(m.originalSource, this.maxSeqPerGroupPerMember.get(m.multicastGroup).get(m.originalSource) + 1); 
                 // Check holdback queue
                 
-                 for(TimeStampedMessage checkedMsg: holdback_queue){
-    			
-                if(checkedMsg.multicastSeq == maxSeqForGroupForSender +1)
-    				{
-    				clock.update(checkedMsg.ts);
-    				clock.increase(local_name);
-    				received_queue.add(checkedMsg);
+                for(TimeStampedMessage checkedMsg: holdback_queue){
+                	if(checkedMsg.multicastSeq == this.maxSeqPerGroupPerMember.get(checkedMsg.multicastGroup).get(checkedMsg.originalSource) + 1){
+                		clock.update(checkedMsg.ts);
+                		clock.increase(local_name);
+                		received_queue.add(checkedMsg);
+                		this.maxSeqPerGroupPerMember.get(checkedMsg.multicastGroup).put(checkedMsg.originalSource,
+                				this.maxSeqPerGroupPerMember.get(checkedMsg.multicastGroup).get(checkedMsg.originalSource) + 1);
     				}
     			}
     		}
@@ -384,18 +396,46 @@ public class MessagePasser implements Runnable
     		
     		// Put in holdback queue and request 
     		else{
+    			if(multicastRcvQueue.size() > 20)
+    				multicastRcvQueue.remove(0);
+    			multicastRcvQueue.add(m);
+    			
     			this.holdback_queue.add(m);
     			Collections.sort(this.holdback_queue, new MessageComparator());
     			ArrayList<String> data = new ArrayList<String>();
     			
     			for(int i = maxSeqForGroupForSender + 1; i <  m.multicastSeq; i++){
     				data.add(0, String.valueOf(i));
-    				data.add(1, m.source);
+    				data.add(1, m.originalSource); // check original source...NOT SURE
     				TimeStampedMessage nack = new TimeStampedMessage(m.multicastGroup, "NACK", data, 
         					this.clock.getTime(), true, m.multicastGroup, m.multicastSeq, null);
     				sendMulticast(m.multicastGroup, nack);
     			}
     		}
+    		
+    		Map<String, Integer> externalMaxSeqPerNodes = m.lastSeqFromMembers;
+    		
+    		
+    		ArrayList<String> data = new ArrayList<String>();
+    		for(String key:externalMaxSeqPerNodes.keySet()){
+    			// For all the nodes except from2 the one which sent the message (because we already covered that)
+    			if(!key.equals(m.originalSource) && !key.equals(this.local_name)){
+    				// Send NACKS for missing messages
+    				int currMaxSeqPerNode = maxSeqPerGroupPerMember.get(m.multicastGroup).get(key);
+	    			for(int i = currMaxSeqPerNode + 1; i <=  externalMaxSeqPerNodes.get(key); i++){
+	    				data.add(0, String.valueOf(i));
+	    				data.add(1, key);
+	    				TimeStampedMessage nack = new TimeStampedMessage(m.multicastGroup, "NACK", data, 
+	        					this.clock.getTime(), true, m.multicastGroup, m.multicastSeq, null);
+	    				
+	    				sendMulticast(m.multicastGroup, nack);
+	    			}
+	    			
+    			}
+    		}
+    		
+    	    	
+        	
     		
     		
     	}
@@ -583,6 +623,7 @@ class OurRunnable implements Runnable
                         TimeStampedMessage duplicate_message = 
                                 new TimeStampedMessage(message.destination,
 						        message.kind,message.data, message.ts, message.isMulticast, message.multicastGroup, message.multicastSeq, message.lastSeqFromMembers);
+                        duplicate_message.originalSource = message.originalSource;
                         duplicate_message.set_source(message.source);
                         duplicate_message.set_seqNum(message.seqNum);
                         duplicate_message.set_duplicate(true);

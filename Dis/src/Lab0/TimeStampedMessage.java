@@ -10,6 +10,7 @@ public class TimeStampedMessage extends Message implements Serializable {
 	public Map<String,Integer> lastSeqFromMembers;
 	public int multicastSeq;
 	public String multicastGroup;
+	public String originalSource;
 	
 	public TimeStampedMessage(String dest, String kind, Object data, TimeStamp t) {
 		super(dest, kind, data);
@@ -19,6 +20,7 @@ public class TimeStampedMessage extends Message implements Serializable {
 		this.multicastSeq = -1;
 		this.lastSeqFromMembers = null;
 		this.multicastGroup = null;
+		this.originalSource = null;
 		
 	}
 	public TimeStampedMessage(String dest, String kind, Object data, TimeStamp t, boolean isMulticast, String multicastGroup, int multicastSeq, Map<String, Integer> lastSeqFromMembers) {
@@ -29,6 +31,7 @@ public class TimeStampedMessage extends Message implements Serializable {
 		this.multicastSeq = multicastSeq;
 		this.lastSeqFromMembers = lastSeqFromMembers;
 		this.multicastGroup = multicastGroup;
+		this.originalSource = null;
 	}
 
 }

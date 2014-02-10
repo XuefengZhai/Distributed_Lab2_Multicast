@@ -23,8 +23,31 @@ sendRules :
     src : nobody
 
 receiveRules :
-  - action : send
-    src : nobody
+  - action : drop
+    src : bob
+    dest : alice
+    seqNum : 0
+  - action : drop
+    src : bob
+    dest : alice
+    seqNum : 1
+  - action : drop
+    src : bob
+    dest : alice
+    seqNum : 2
+  - action : drop
+    src : bob
+    dest : alice
+    seqNum : 3
+  - action : drop
+    src : bob
+    dest : alice
+    seqNum : 4
+  - action : drop
+    src : bob
+    dest : alice
+    seqNum : 5
+
 
 groups :
   - name: Group 1
